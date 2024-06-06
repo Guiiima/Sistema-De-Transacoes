@@ -28,6 +28,8 @@ def register_validator():
         'hold_expires': datetime.min
     }
 
+    print(validadores)
+
     return jsonify({"message": "Validator registered"}), 201
 
 @seletor_blueprint.route('/seletor/select', methods=['POST'])
@@ -47,7 +49,7 @@ def select_validators():
 
     for id_validador in selecionados:
         validadores[id_validador]['validacoes_consecutivas'] += 1
-
+        
     return jsonify({"selected_validators": selecionados}), 200
 
 @seletor_blueprint.route('/seletor/consenso', methods=['POST'])

@@ -1,9 +1,11 @@
 from flask import Blueprint, request, jsonify
-from datetime import datetime
+from datetime import datetime, timedelta
 from rules import verificar_saldo, verificar_horario_transacao, verificar_limite_transacoes, verificar_chave_validador
+from config import *
+import random
+import requests
 
 validador_blueprint = Blueprint('validador', __name__)
-
 
 validadores_registrados = {
     "validador_1": {"chave": "abc123", "saldo": 1000},
@@ -19,6 +21,23 @@ transacoes_remetente = {
     },
 
 }
+
+validador = {
+    "id": random.randint(0, 999999),
+    "saldo": random.uniform(30.0, 2500.0),
+    "addr": 'http://' + validator_ip + ':' + str(validator_port)
+}
+
+@validador_blueprint.route('/validador/registrar', methods= ['POST'])
+def register_validator():
+    print(validador['id'])
+    print(validador['saldo'])
+
+    url = seletor_url + '/seletor'
+    resp = requests.post(url= url, json= validador)
+
+    if resp.status_code == 201:
+        return resp.text
 
 
 @validador_blueprint.route('/validador', methods=['POST'])
