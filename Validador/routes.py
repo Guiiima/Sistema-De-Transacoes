@@ -7,11 +7,6 @@ import requests
 
 validador_blueprint = Blueprint('validador', __name__)
 
-validadores_registrados = {
-    "validador_1": {"chave": "abc123", "saldo": 1000},
-
-}
-
 transacoes_remetente = {
     "remetente_1": {
         "saldo": 500,
@@ -30,14 +25,17 @@ validador = {
 
 @validador_blueprint.route('/validador/registrar', methods= ['POST'])
 def register_validator():
-    print(validador['id'])
-    print(validador['saldo'])
-
     url = seletor_url + '/seletor'
     resp = requests.post(url= url, json= validador)
 
     if resp.status_code == 201:
         return resp.text
+    
+@validador_blueprint.route('/validador/teste', methods=['GET', 'POST'])
+def teste():
+    data = request.json
+    print(data)
+    return 'pong'
 
 
 @validador_blueprint.route('/validador', methods=['POST'])

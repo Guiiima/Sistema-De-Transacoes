@@ -1,23 +1,37 @@
 from flask import Blueprint, request, jsonify
 from datetime import datetime, timedelta
-from random import choices
 from rules import validar_seletor
+import requests
+import sqlite3
 
 seletor_blueprint = Blueprint('seletor', __name__)
 
-validadores = {}
+validadores = []
 transacoes_pendentes = []
 
 @seletor_blueprint.route('/seletor', methods=['POST'])
 def register_validator():
     data = request.json
+
     id_validador = data['id']
     saldo = data['saldo']
     flag = data.get('flag', 0)
+    addr = data['addr']
 
     if saldo < 50:
         return jsonify({"message": "Saldo insuficiente"}), 400
 
+    conn = sqlite3.connect('validators.db')
+    cursor = conn.cursor()
+
+    cursor.execute("""
+                    INSERT INTO validators VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                   """, (id_validador, saldo, flag, 0, 0, False, 0, addr)
+    )
+
+    conn.commit()
+
+    """
     validadores[id_validador] = {
         'saldo': saldo,
         'flag': flag,
@@ -25,12 +39,27 @@ def register_validator():
         'validacoes_consecutivas': 0,
         'transacoes_coerentes': 0,
         'hold': False,
-        'hold_expires': datetime.min
+        'hold_expires': datetime.min,
+        'addr': addr
     }
+    """
 
     print(validadores)
-
+    conn.close()
     return jsonify({"message": "Validator registered"}), 201
+
+
+@seletor_blueprint.route('/seletor/teste', methods=['GET'])
+def teste():
+    z
+    validadores1 = list(validadores.values())
+    validador = validadores1[0]
+    resp = requests.post(validador['addr'] + '/validador/teste', json= ping)
+    print(resp.text)
+
+    return ping + resp.text
+
+
 
 @seletor_blueprint.route('/seletor/select', methods=['POST'])
 def select_validators():
