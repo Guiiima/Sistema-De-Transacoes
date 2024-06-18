@@ -195,7 +195,7 @@ def CriaTransacao(rem, reb, valor):
         seletores = Seletor.query.all()
         for seletor in seletores:
             #Implementar a rota /localhost/<ipSeletor>/transacoes
-            url = seletor.ip + '/transacoes/'
+            url = 'http://' + seletor.ip + '/transacoes/'
             requests.post(url, data=jsonify(objeto))
         return jsonify(objeto)
     else:

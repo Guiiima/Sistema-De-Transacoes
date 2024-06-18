@@ -8,7 +8,7 @@ from config import *
 seletor_blueprint = Blueprint('seletor', __name__)
 seletor = {
     "nome": "Seletor",
-    "ip": 'http://' + seletor_ip + ':' + str(seletor_port)
+    "ip": seletor_ip + ':' + str(seletor_port)
 }
 
 validadores = []
@@ -17,10 +17,11 @@ transacoes_pendentes = []
 @seletor_blueprint.route('/seletor/registrar', methods=['POST'])
 def register_seletor():
     url = banco_url + 'seletor/' + seletor["nome"] + '/' + seletor["ip"]
-    print(url)
-    resp = requests.post(url= url)
+    requests.post(url= url)
 
-    return resp
+@seletor_blueprint.route('/transacoes/', methods=['POST'])
+def transacao():
+    print("saddfadf")
     
 
 def get_validators():
