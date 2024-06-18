@@ -18,7 +18,6 @@ transacoes_remetente = {
 }
 
 validador = {
-    "id": random.randint(0, 999999),
     "saldo": random.uniform(30.0, 2500.0),
     "addr": 'http://' + validator_ip + ':' + str(validator_port)
 }
@@ -30,13 +29,6 @@ def register_validator():
 
     if resp.status_code == 201:
         return resp.text
-    
-@validador_blueprint.route('/validador/teste', methods=['GET', 'POST'])
-def teste():
-    data = request.json
-    print(data)
-    return 'pong'
-
 
 @validador_blueprint.route('/validador', methods=['POST'])
 def validate_transaction():

@@ -14,7 +14,7 @@ def getValidatorsFromDB():
     cursor.execute(
         """
         CREATE TABLE IF NOT EXISTS validators (
-            id INTEGER PRIMARY KEY,
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
             saldo REAL,
             flags INTEGER,
             validacoes INTEGER,
