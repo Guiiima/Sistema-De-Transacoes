@@ -1,15 +1,14 @@
 from datetime import datetime, timedelta
 import random
 import time
-from time import sleep
 
-from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from dataclasses import dataclass
 import requests
 from flask import Flask, request, jsonify
 import random
+from urllib.parse import quote
 
 app = Flask(__name__)
 
@@ -17,6 +16,10 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///validadores.db'
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
+ip = '172.17.0.1'
+banco_url = 'http://' + ip + ':5000'
+
+seletor_url = ip + ':5001'
 
 @dataclass
 class Validador(db.Model):
@@ -94,10 +97,11 @@ def validar_transacoes():
     validadores = Validador.query.filter(Validador.hold == False).all()
 
     data = request.json
+    data['horario'] = datetime.now()
     selected_validadores = []
 
     while len(selected_validadores) < 3:
-        url = 'http://localhost:5000/cliente/' + str(data['remetente'])
+        url = 'http://172.17.0.1:5000/cliente/' + str(data['remetente'])
         cliente = requests.get(url).json()
 
         # Calcular as chances de escolha com base nos percentuais
@@ -125,7 +129,7 @@ def validar_transacoes():
             time.sleep(60)
 
     # Filtrar as transações pelo remetente
-    url_transacoes = 'http://localhost:5000/transacoes'
+    url_transacoes = 'http://172.17.0.1:5000/transacoes'
     transacoes_response = requests.get(url_transacoes)
     transacoes_lista = transacoes_response.json()
 
@@ -133,9 +137,13 @@ def validar_transacoes():
     transacoes_filtradas = [transacao for transacao in transacoes_lista if transacao['remetente'] == remetente_id]
 
     # Verificar transações com horário maior ou igual a data['horario'] - 1 minuto
-    horario_limite = datetime.fromisoformat(data['horario']) - datetime.timedelta(minutes=1)
+    horario_limite = data['horario'] - timedelta(minutes=1)
     transacoes_recentes = [transacao for transacao in transacoes_filtradas if
-                           datetime.fromisoformat(transacao['horario']) >= horario_limite]
+                           transacao['horario'] >= horario_limite]
+    # # Verificar transações com horário maior ou igual a data['horario'] - 1 minuto
+    # horario_limite = datetime.fromisoformat(data['horario']) - timedelta(minutes=1)
+    # transacoes_recentes = [transacao for transacao in transacoes_filtradas if
+    #                        datetime.fromisoformat(transacao['horario']) >= horario_limite]
 
     # Exemplo de resposta (pode ser adaptado conforme necessário)
     conteudo_validacao = {
@@ -157,5 +165,9 @@ def validar_transacoes():
         db.session.commit()
 
     return 200
+
+# if __name__ == '__main__':
+#     url = banco_url + '/seletor/Seletor/' + seletor_url
+#     resposta = requests.post(url)
 
 app.run(host='0.0.0.0', port= 5001, debug=True)
