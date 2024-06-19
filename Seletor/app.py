@@ -1,39 +1,36 @@
 from flask import Flask
-from routes import seletor_blueprint, validadores
-import sqlite3
+from flask_sqlalchemy import SQLAlchemy
+from flask_migrate import Migrate
+from dataclasses import dataclass
+import requests
 
 app = Flask(__name__)
-app.register_blueprint(seletor_blueprint)
 
+app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///validadores.db'
+db = SQLAlchemy(app)
+migrate = Migrate(app, db)
 
-def getValidatorsFromDB():
-    global validadores
-    conn = sqlite3.connect('validators.db')
+@dataclass
+class Validador(db.Model):
+    id: int
+    saldo: float
+    flags: int
+    validacoes: int
+    transacoes_corretas: int
+    hold: bool
+    hold_expires: int
+    ip: str
 
-    cursor = conn.cursor()
-    cursor.execute(
-        """
-        CREATE TABLE IF NOT EXISTS validators (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            saldo REAL,
-            flags INTEGER,
-            validacoes INTEGER,
-            transacoes_corretas INTEGER,
-            hold BOOLEAN,
-            hold_expires INTEGER,
-            addr VARCHAR
-        )
-        """
-    )
-    cursor.execute("SELECT * FROM validators")
-    data = cursor.fetchall()
-    validadores = data
-    print(validadores)
+    id = db.Column(db.Integer, primary_key=True)
+    saldo = db.Column(db.Float)
+    flags = db.Column(db.Integer)
+    validacoes = db.Column(db.Integer)
+    transacoes_corretas = db.Column(db.Integer)
+    hold = db.Column(db.Boolean)
+    hold_expires = db.Column(db.Integer)
+    ip = db.Column(db.String(30), nullable=False)
 
-    conn.close()
+with app.app_context():
+    db.create_all()
 
-if __name__ == '__main__':
-    getValidatorsFromDB()
-
-    app.run(host='0.0.0.0', port=5001)
-
+app.run(host='0.0.0.0', debug=True)
