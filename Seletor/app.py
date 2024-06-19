@@ -1,4 +1,4 @@
-import datetime
+from datetime import datetime, timedelta
 import random
 import time
 from time import sleep
@@ -41,9 +41,6 @@ class Validador(db.Model):
 with app.app_context():
     db.create_all()
 
-app.run(host='0.0.0.0', debug=True)
-
-
 @app.route('/seletor/validador', methods=['POST'])
 def cadastrar_validador():
     #tem que receber uma chave única do seletor(criar método pra gerar e devolver para salvar) - fazer no ID
@@ -81,14 +78,14 @@ def cadastrar_validador():
 @app.route('/transacoes/', methods=['POST'])
 def validar_transacoes():
     # Escolher os validadores
-    validadores = Validador.query.filter(Validador.hold != False).all()
+    validadores = Validador.query.filter(Validador.hold == False).all()
 
     data = request.json
     selected_validadores = []
 
     while len(selected_validadores) < 3:
-        url = 'http://localhost:5000/cliente/' + data['remetente']
-        cliente = requests.get(url)
+        url = 'http://localhost:5000/cliente/' + str(data['remetente'])
+        cliente = requests.get(url).json()
 
         # Calcular as chances de escolha com base nos percentuais
         total_saldo = sum(v.saldo for v in validadores)
@@ -111,11 +108,11 @@ def validar_transacoes():
         # Selecionar aleatoriamente os 3 validadores
         selected_validadores = random.choices(validadores, weights=normalized_chances, k=3)
 
-        if len(selected_validadores):
+        if len(selected_validadores) < 3:
             time.sleep(60)
 
     # Filtrar as transações pelo remetente
-    url_transacoes = 'http://localhost:5000/transacoes/'
+    url_transacoes = 'http://localhost:5000/transacoes'
     transacoes_response = requests.get(url_transacoes)
     transacoes_lista = transacoes_response.json()
 
@@ -147,3 +144,5 @@ def validar_transacoes():
         db.session.commit()
 
     return 200
+
+app.run(host='0.0.0.0', port= 5001, debug=True)
