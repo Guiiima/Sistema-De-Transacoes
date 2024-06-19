@@ -9,6 +9,7 @@ from flask_migrate import Migrate
 from dataclasses import dataclass
 import requests
 from flask import Flask, request, jsonify
+import random
 
 app = Flask(__name__)
 
@@ -41,9 +42,15 @@ class Validador(db.Model):
 with app.app_context():
     db.create_all()
 
+def gerar_id():
+    id = random.randint(1, 99999999)
+    while (id == 0 or Validador.query.get(id) != None):
+        id = random.randint(1, 99999999)
+
+    return id
+
 @app.route('/seletor/validador', methods=['POST'])
 def cadastrar_validador():
-    #tem que receber uma chave única do seletor(criar método pra gerar e devolver para salvar) - fazer no ID
     data = request.json
 
     # Verifique se todos os campos necessários estão presentes
@@ -53,8 +60,14 @@ def cadastrar_validador():
             return jsonify({"status": "error", "message": f"Campo {field} é obrigatório"}), 400
 
     # Crie uma nova instância de Validador com os dados recebidos
-    #saldo tem que ser maior que 50 para poder se cadastrar
+    # saldo tem que ser maior que 50 para poder se cadastrar
+    if (data['saldo'] < 50):
+        return jsonify({"status": "error", "message": "É necessário ter no mínimo 50 moedas para se tornar um validador"}), 400
+    
+    # tem que receber uma chave única do seletor(criar método pra gerar e devolver para salvar) - fazer no ID
+    id = gerar_id()
     novo_validador = Validador(
+        id=id,
         saldo=data['saldo'],
         flags=0,
         validacoes=0,
@@ -69,7 +82,7 @@ def cadastrar_validador():
     try:
         db.session.add(novo_validador)
         db.session.commit()
-        return jsonify({"status": "success", "message": "Validador cadastrado com sucesso"}), 201
+        return jsonify({"status": "success", "message": "Validador cadastrado com sucesso", "id": id}), 201
     except Exception as e:
         db.session.rollback()
         return jsonify({"status": "error", "message": f"Erro ao cadastrar validador: {str(e)}"}), 500
