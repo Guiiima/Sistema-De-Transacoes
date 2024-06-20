@@ -16,7 +16,8 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///validadores.db'
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
-ip = '172.17.0.1'
+# Para usar sem o docker mudar para 'localhost'
+ip = 'localhost'
 banco_url = 'http://' + ip + ':5000'
 
 seletor_url = ip + ':5001'
@@ -97,11 +98,10 @@ def validar_transacoes():
     validadores = Validador.query.filter(Validador.hold == False).all()
 
     data = request.json
-    data['horario'] = datetime.now()
     selected_validadores = []
 
     while len(selected_validadores) < 3:
-        url = 'http://172.17.0.1:5000/cliente/' + str(data['remetente'])
+        url = banco_url + '/cliente/' + str(data['remetente'])
         cliente = requests.get(url).json()
 
         # Calcular as chances de escolha com base nos percentuais
@@ -129,7 +129,7 @@ def validar_transacoes():
             time.sleep(60)
 
     # Filtrar as transações pelo remetente
-    url_transacoes = 'http://172.17.0.1:5000/transacoes'
+    url_transacoes = banco_url + '/transacoes'
     transacoes_response = requests.get(url_transacoes)
     transacoes_lista = transacoes_response.json()
 
@@ -137,9 +137,9 @@ def validar_transacoes():
     transacoes_filtradas = [transacao for transacao in transacoes_lista if transacao['remetente'] == remetente_id]
 
     # Verificar transações com horário maior ou igual a data['horario'] - 1 minuto
-    horario_limite = data['horario'] - timedelta(minutes=1)
+    horario_limite = datetime.fromisoformat(data['horario']) - timedelta(minutes=1)
     transacoes_recentes = [transacao for transacao in transacoes_filtradas if
-                           transacao['horario'] >= horario_limite]
+                           datetime.fromisoformat(transacao['horario']) >= horario_limite]
     # # Verificar transações com horário maior ou igual a data['horario'] - 1 minuto
     # horario_limite = datetime.fromisoformat(data['horario']) - timedelta(minutes=1)
     # transacoes_recentes = [transacao for transacao in transacoes_filtradas if
@@ -166,8 +166,8 @@ def validar_transacoes():
 
     return 200
 
-# if __name__ == '__main__':
-#     url = banco_url + '/seletor/Seletor/' + seletor_url
-#     resposta = requests.post(url)
+if __name__ == '__main__':
+    url = banco_url + '/seletor/Seletor/' + seletor_url
+    resposta = requests.post(url)
 
 app.run(host='0.0.0.0', port= 5001, debug=True)

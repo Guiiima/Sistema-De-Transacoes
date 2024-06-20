@@ -191,12 +191,20 @@ def CriaTransacao(rem, reb, valor):
         objeto = Transacao(remetente=rem, recebedor=reb,valor=valor,status=0,horario=datetime.now())
         db.session.add(objeto)
         db.session.commit()
+
+        temp = {
+            'remetente': objeto.remetente,
+            'recebedor': objeto.recebedor,
+            'valor': objeto.valor,
+            'status': objeto.status,
+            'horario': str(objeto.horario)
+        }
 		
         seletores = Seletor.query.all()
         for seletor in seletores:
             #Implementar a rota /localhost/<ipSeletor>/transacoes
             url = 'http://' + seletor.ip + '/transacoes/'
-            requests.post(url, data=jsonify(objeto))
+            requests.post(url, json=temp)
         return jsonify(objeto)
     else:
         return jsonify(['Method Not Allowed'])
