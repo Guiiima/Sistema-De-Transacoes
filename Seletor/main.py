@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta
-import random
 import time
 
 from flask_sqlalchemy import SQLAlchemy
@@ -8,7 +7,6 @@ from dataclasses import dataclass
 import requests
 from flask import Flask, request, jsonify
 import random
-from urllib.parse import quote
 
 app = Flask(__name__)
 
@@ -21,6 +19,8 @@ ip = 'localhost'
 banco_url = 'http://' + ip + ':5000'
 
 seletor_url = ip + ':5001'
+
+validacoes_pendentes = {}
 
 @dataclass
 class Validador(db.Model):
@@ -45,6 +45,11 @@ class Validador(db.Model):
 
 with app.app_context():
     db.create_all()
+
+@app.route('/cadastrar_seletor', methods=['POST'])
+def cadastrar_seletor():
+    url = banco_url + '/seletor/Seletor/' + seletor_url
+    requests.post(url)
 
 def gerar_id():
     id = random.randint(1, 99999999)
@@ -91,6 +96,10 @@ def cadastrar_validador():
         db.session.rollback()
         return jsonify({"status": "error", "message": f"Erro ao cadastrar validador: {str(e)}"}), 500
 
+@app.route('/remover_validador', methods=['POST'])
+def remover_validador():
+    # TODO - Remoção do validador
+    ...
 
 @app.route('/transacoes/', methods=['POST'])
 def validar_transacoes():
@@ -98,6 +107,7 @@ def validar_transacoes():
     validadores = Validador.query.filter(Validador.hold == False).all()
 
     data = request.json
+    # print(data)
     selected_validadores = []
 
     while len(selected_validadores) < 3:
@@ -133,6 +143,8 @@ def validar_transacoes():
     transacoes_response = requests.get(url_transacoes)
     transacoes_lista = transacoes_response.json()
 
+    ultima_transacao = sorted(transacoes_lista, key= lambda t: t['horario']).pop()
+
     remetente_id = int(data['remetente'])
     transacoes_filtradas = [transacao for transacao in transacoes_lista if transacao['remetente'] == remetente_id]
 
@@ -142,18 +154,31 @@ def validar_transacoes():
         transacao['horario'] = datetime.strptime(transacao['horario'], '%a, %d %b %Y %H:%M:%S %Z').strftime('%Y-%m-%dT%H:%M:%S.%f')
     transacoes_recentes = [transacao for transacao in transacoes_filtradas if
                            datetime.fromisoformat(transacao['horario']) >= horario_limite]
+    
+    hora_atual = datetime.strptime(requests.get(banco_url + '/hora').json(), '%a, %d %b %Y %H:%M:%S %Z').strftime('%Y-%m-%dT%H:%M:%S.%f')
 
     # Exemplo de resposta (pode ser adaptado conforme necessário)
     conteudo_validacao = {
+        "id_transacao": data['id'],
         "saldo_cliente": cliente['qtdMoeda'],
         "valor_transacao": data['valor'],
         "horario": data['horario'],
-        "ultimas_transacoes": transacoes_recentes
+        "ultimas_transacoes": transacoes_recentes,
+        "horario_atual": hora_atual,
+        "horario_ultima_transacao": ultima_transacao['horario']
     }
 
+    # print(conteudo_validacao)
+
+    validadores = []
     for valid in selected_validadores:
         url = 'http://' + valid.ip + '/validar_transacao/'
+        validador = { 'id': valid.id, 'status': 0 }
+        validadores.append(validador)
         requests.post(url, conteudo_validacao)
+    
+    validacoes_pendentes[data['id']] = { validadores: validadores }
+    # print(validacoes_pendentes)
 
     validadores_hold = Validador.query.filter(Validador.hold == False).all()
     for valid in validadores_hold:
@@ -164,8 +189,11 @@ def validar_transacoes():
 
     return 200
 
-# if __name__ == '__main__':
-#     url = banco_url + '/seletor/Seletor/' + seletor_url
-#     resposta = requests.post(url)
+@app.route('/transacoes/resposta', methods=['POST'])
+def resposta_transacao():
+    # TODO - Resposta da Transação
+    # data = {id_transação, status}
+    ...
+
 
 app.run(host='0.0.0.0', port= 5001, debug=True)
