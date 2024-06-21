@@ -138,12 +138,10 @@ def validar_transacoes():
 
     # Verificar transações com horário maior ou igual a data['horario'] - 1 minuto
     horario_limite = datetime.fromisoformat(data['horario']) - timedelta(minutes=1)
+    for transacao in transacoes_filtradas:
+        transacao['horario'] = datetime.strptime(transacao['horario'], '%a, %d %b %Y %H:%M:%S %Z').strftime('%Y-%m-%dT%H:%M:%S.%f')
     transacoes_recentes = [transacao for transacao in transacoes_filtradas if
                            datetime.fromisoformat(transacao['horario']) >= horario_limite]
-    # # Verificar transações com horário maior ou igual a data['horario'] - 1 minuto
-    # horario_limite = datetime.fromisoformat(data['horario']) - timedelta(minutes=1)
-    # transacoes_recentes = [transacao for transacao in transacoes_filtradas if
-    #                        datetime.fromisoformat(transacao['horario']) >= horario_limite]
 
     # Exemplo de resposta (pode ser adaptado conforme necessário)
     conteudo_validacao = {
@@ -166,8 +164,8 @@ def validar_transacoes():
 
     return 200
 
-if __name__ == '__main__':
-    url = banco_url + '/seletor/Seletor/' + seletor_url
-    resposta = requests.post(url)
+# if __name__ == '__main__':
+#     url = banco_url + '/seletor/Seletor/' + seletor_url
+#     resposta = requests.post(url)
 
 app.run(host='0.0.0.0', port= 5001, debug=True)
