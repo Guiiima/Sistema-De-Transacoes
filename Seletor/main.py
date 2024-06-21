@@ -1,5 +1,4 @@
 from datetime import datetime, timedelta
-import random
 import time
 
 from flask_sqlalchemy import SQLAlchemy
@@ -8,7 +7,6 @@ from dataclasses import dataclass
 import requests
 from flask import Flask, request, jsonify
 import random
-from urllib.parse import quote
 
 app = Flask(__name__)
 
@@ -45,6 +43,11 @@ class Validador(db.Model):
 
 with app.app_context():
     db.create_all()
+
+@app.route('/cadastrar_seletor', methods=['POST'])
+def cadastrar_seletor():
+    url = banco_url + '/seletor/Seletor/' + seletor_url
+    requests.post(url)
 
 def gerar_id():
     id = random.randint(1, 99999999)
@@ -133,6 +136,8 @@ def validar_transacoes():
     transacoes_response = requests.get(url_transacoes)
     transacoes_lista = transacoes_response.json()
 
+    ultima_transacao = sorted(transacoes_lista, key= lambda t: t['horario']).pop()
+
     remetente_id = int(data['remetente'])
     transacoes_filtradas = [transacao for transacao in transacoes_lista if transacao['remetente'] == remetente_id]
 
@@ -142,14 +147,20 @@ def validar_transacoes():
         transacao['horario'] = datetime.strptime(transacao['horario'], '%a, %d %b %Y %H:%M:%S %Z').strftime('%Y-%m-%dT%H:%M:%S.%f')
     transacoes_recentes = [transacao for transacao in transacoes_filtradas if
                            datetime.fromisoformat(transacao['horario']) >= horario_limite]
+    
+    hora_atual = datetime.strptime(requests.get(banco_url + '/hora').json(), '%a, %d %b %Y %H:%M:%S %Z').strftime('%Y-%m-%dT%H:%M:%S.%f')
 
     # Exemplo de resposta (pode ser adaptado conforme necessário)
     conteudo_validacao = {
         "saldo_cliente": cliente['qtdMoeda'],
         "valor_transacao": data['valor'],
         "horario": data['horario'],
-        "ultimas_transacoes": transacoes_recentes
+        "ultimas_transacoes": transacoes_recentes,
+        "horario_atual": hora_atual,
+        "horario_ultima_transacao": ultima_transacao['horario']
     }
+
+    print(conteudo_validacao)
 
     for valid in selected_validadores:
         url = 'http://' + valid.ip + '/validar_transacao/'
@@ -163,9 +174,5 @@ def validar_transacoes():
         db.session.commit()
 
     return 200
-
-# if __name__ == '__main__':
-#     url = banco_url + '/seletor/Seletor/' + seletor_url
-#     resposta = requests.post(url)
 
 app.run(host='0.0.0.0', port= 5001, debug=True)
