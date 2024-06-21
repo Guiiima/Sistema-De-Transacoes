@@ -20,6 +20,8 @@ banco_url = 'http://' + ip + ':5000'
 
 seletor_url = ip + ':5001'
 
+validacoes_pendentes = {}
+
 @dataclass
 class Validador(db.Model):
     id: int
@@ -94,6 +96,10 @@ def cadastrar_validador():
         db.session.rollback()
         return jsonify({"status": "error", "message": f"Erro ao cadastrar validador: {str(e)}"}), 500
 
+@app.route('/remover_validador', methods=['POST'])
+def remover_validador():
+    # TODO - Remoção do validador
+    ...
 
 @app.route('/transacoes/', methods=['POST'])
 def validar_transacoes():
@@ -101,6 +107,7 @@ def validar_transacoes():
     validadores = Validador.query.filter(Validador.hold == False).all()
 
     data = request.json
+    # print(data)
     selected_validadores = []
 
     while len(selected_validadores) < 3:
@@ -152,6 +159,7 @@ def validar_transacoes():
 
     # Exemplo de resposta (pode ser adaptado conforme necessário)
     conteudo_validacao = {
+        "id_transacao": data['id'],
         "saldo_cliente": cliente['qtdMoeda'],
         "valor_transacao": data['valor'],
         "horario": data['horario'],
@@ -160,11 +168,17 @@ def validar_transacoes():
         "horario_ultima_transacao": ultima_transacao['horario']
     }
 
-    print(conteudo_validacao)
+    # print(conteudo_validacao)
 
+    validadores = []
     for valid in selected_validadores:
         url = 'http://' + valid.ip + '/validar_transacao/'
+        validador = { 'id': valid.id, 'status': 0 }
+        validadores.append(validador)
         requests.post(url, conteudo_validacao)
+    
+    validacoes_pendentes[data['id']] = { validadores: validadores }
+    # print(validacoes_pendentes)
 
     validadores_hold = Validador.query.filter(Validador.hold == False).all()
     for valid in validadores_hold:
@@ -174,5 +188,12 @@ def validar_transacoes():
         db.session.commit()
 
     return 200
+
+@app.route('/transacoes/resposta', methods=['POST'])
+def resposta_transacao():
+    # TODO - Resposta da Transação
+    # data = {id_transação, status}
+    ...
+
 
 app.run(host='0.0.0.0', port= 5001, debug=True)
