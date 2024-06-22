@@ -1,0 +1,4 @@
+O seletor random de validadores está selecionando o mesmo validador mais de uma vez
+Espera máxima da transação = 1min. cancelar?
+É possível que após a transação ser validada, outra transação ocorra primeiro para o mesmo remetente? nesta situação o remetente, não teria a mesma qtdMoeda, e possivelmente, não tenha mais moedas suficientes
+o banco não recebe as moedas para o seletor. A taxa da transação será aplicada para o seletor como?

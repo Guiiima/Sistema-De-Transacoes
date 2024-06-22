@@ -7,6 +7,7 @@ from dataclasses import dataclass
 import requests
 from flask import Flask, request, jsonify
 import random
+from collections import Counter
 
 app = Flask(__name__)
 
@@ -51,13 +52,6 @@ def cadastrar_seletor():
     url = banco_url + '/seletor/Seletor/' + seletor_url
     requests.post(url)
 
-def gerar_id():
-    id = random.randint(1, 99999999)
-    while (id == 0 or Validador.query.get(id) != None):
-        id = random.randint(1, 99999999)
-
-    return id
-
 @app.route('/seletor/validador', methods=['POST'])
 def cadastrar_validador():
     data = request.json
@@ -73,10 +67,7 @@ def cadastrar_validador():
     if (data['saldo'] < 50):
         return jsonify({"status": "error", "message": "É necessário ter no mínimo 50 moedas para se tornar um validador"}), 400
     
-    # tem que receber uma chave única do seletor(criar método pra gerar e devolver para salvar) - fazer no ID
-    id = gerar_id()
     novo_validador = Validador(
-        id=id,
         saldo=data['saldo'],
         flags=0,
         validacoes=0,
@@ -85,21 +76,29 @@ def cadastrar_validador():
         hold_expires=0,
         ip=data['ip']
     )
-    #invocar método para recuperar seu ID/Chave e então salvar
 
     # Adicione e confirme a nova instância no banco de dados
     try:
         db.session.add(novo_validador)
         db.session.commit()
-        return jsonify({"status": "success", "message": "Validador cadastrado com sucesso", "id": id}), 201
+        return jsonify({"status": "success", "message": "Validador cadastrado com sucesso", "id": novo_validador.id}), 201
     except Exception as e:
         db.session.rollback()
         return jsonify({"status": "error", "message": f"Erro ao cadastrar validador: {str(e)}"}), 500
 
-@app.route('/remover_validador', methods=['POST'])
+@app.route('/remover_validador/<int:id>', methods=['DELETE'])
 def remover_validador():
-    # TODO - Remoção do validador
-    ...
+    if (request.method == 'DELETE'):
+        objeto = Validador.query.get(id)
+        db.session.delete(objeto)
+        db.session.commit()
+
+        data = {
+            'message': 'Validador removido com sucesso!'
+        }
+        return jsonify(data)
+    else:
+        return jsonify(['Method Not Allowed'])
 
 @app.route('/transacoes/', methods=['POST'])
 def validar_transacoes():
@@ -107,7 +106,6 @@ def validar_transacoes():
     validadores = Validador.query.filter(Validador.hold == False).all()
 
     data = request.json
-    # print(data)
     selected_validadores = []
 
     while len(selected_validadores) < 3:
@@ -133,6 +131,7 @@ def validar_transacoes():
         normalized_chances = [c / total_chances for c in chances]
 
         # Selecionar aleatoriamente os 3 validadores
+        # TODO - Está selecionando o mesmo validador mais de uma vez
         selected_validadores = random.choices(validadores, weights=normalized_chances, k=3)
 
         if len(selected_validadores) < 3:
@@ -168,17 +167,26 @@ def validar_transacoes():
         "horario_ultima_transacao": ultima_transacao['horario']
     }
 
-    # print(conteudo_validacao)
-
     validadores = []
     for valid in selected_validadores:
-        url = 'http://' + valid.ip + '/validar_transacao/'
+        # url = 'http://' + valid.ip + '/validar_transacao/'
         validador = { 'id': valid.id, 'status': 0 }
         validadores.append(validador)
-        requests.post(url, conteudo_validacao)
+        # requests.post(url, conteudo_validacao)
     
-    validacoes_pendentes[data['id']] = { validadores: validadores }
-    # print(validacoes_pendentes)
+    validacoes_pendentes[data['id']] = { 
+        'transacao': {
+            'remetente': data['remetente'],
+            'recebedor': data['recebedor'],
+            'saldo_remetente': cliente['qtdMoeda'],
+            'valor': data['valor']
+        },
+        'validadores': validadores, 
+        'respostas': 0, 
+        'n_validadores': len(selected_validadores) 
+    }
+
+    print(validacoes_pendentes)
 
     validadores_hold = Validador.query.filter(Validador.hold == False).all()
     for valid in validadores_hold:
@@ -191,9 +199,52 @@ def validar_transacoes():
 
 @app.route('/transacoes/resposta', methods=['POST'])
 def resposta_transacao():
-    # TODO - Resposta da Transação
-    # data = {id_transação, status}
-    ...
+    data = request.json
+    id_transacao = data['id_transacao']
+    id_validador = data['id_validador']
+    status = data['status']
+
+    transacao = validacoes_pendentes[id_transacao]
+
+    validador = next((v for v in transacao['validadores'] if v['id'] == id_validador), None)
+
+    if (not validador):
+        return jsonify(['Validador Inválido']), 400
+    
+    if (validador['status'] != 0):
+        return jsonify(['Validador já havia respondido!']), 400
+
+    validador['status'] = status
+    transacao['respostas'] += 1
+
+    if (transacao['respostas'] != transacao['n_validadores']):
+        return jsonify(['Validação Concluída com Sucesso']), 200
+    
+    cont_status = Counter(validador['status'] for validador in transacao['validadores'])
+    status_eleito, quant_status = cont_status.most_common(1)[0]
+
+    url = banco_url + f'/transacoes/{id_transacao}/{status_eleito}'
+    requests.post(url)
+
+    dados_transacao = transacao['transacao']
+
+    moedas_remetente = dados_transacao['saldo_remetente'] - (dados_transacao['valor'] * 1.015)
+
+    url = banco_url + f'/cliente/{str(dados_transacao['recebedor'])}'
+    moedas_recebedor = requests.get(url).json()['qtdMoeda'] + dados_transacao['valor']
+
+    editar_cliente(dados_transacao['remetente'], moedas_remetente)
+    editar_cliente(dados_transacao['recebedor'], moedas_recebedor)
+
+    # TODO - Remover transação de transações pendentes
+    # TODO - Alterar validadores
+
+    return 200
+
+
+def editar_cliente(id: int, moedas: int):
+    url = banco_url + f'/cliente/{str(id)}/{str(moedas)}'
+    requests.post(url)   
 
 
 app.run(host='0.0.0.0', port= 5001, debug=True)
