@@ -2,7 +2,7 @@ from time import time
 from flask import Flask, request, redirect, render_template, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 from datetime import date, datetime
 import requests
 
@@ -191,12 +191,15 @@ def CriaTransacao(rem, reb, valor):
         objeto = Transacao(remetente=rem, recebedor=reb,valor=valor,status=0,horario=datetime.now())
         db.session.add(objeto)
         db.session.commit()
+
+        data = asdict(objeto)
+        data['horario'] = data['horario'].isoformat()
 		
         seletores = Seletor.query.all()
         for seletor in seletores:
             #Implementar a rota /localhost/<ipSeletor>/transacoes
-            url = seletor.ip + '/transacoes/'
-            requests.post(url, data=jsonify(objeto))
+            url = 'http://' + seletor.ip + '/transacoes/'
+            requests.post(url, json=data)
         return jsonify(objeto)
     else:
         return jsonify(['Method Not Allowed'])
