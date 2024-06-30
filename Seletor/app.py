@@ -8,8 +8,10 @@ import requests
 from flask import Flask, request, jsonify
 import random
 from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
 
 app = Flask(__name__)
+executor = ThreadPoolExecutor(max_workers=2)
 
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///validadores.db'
 db = SQLAlchemy(app)
@@ -51,6 +53,8 @@ with app.app_context():
 def cadastrar_seletor():
     url = banco_url + '/seletor/Seletor/' + seletor_url
     requests.post(url)
+
+    return 200
 
 @app.route('/seletor/validador', methods=['POST'])
 def cadastrar_validador():
@@ -102,13 +106,16 @@ def remover_validador():
 
 @app.route('/transacoes/', methods=['POST'])
 def validar_transacoes():
+    data = request.json
+    selected_validadores = []
+    sleep = 0
+
     # Escolher os validadores
     validadores = Validador.query.filter(Validador.hold == False).all()
 
-    data = request.json
-    selected_validadores = []
-
+    id_transacao = data['id']
     while len(selected_validadores) < 3:
+        print("Tentando")
         url = banco_url + '/cliente/' + str(data['remetente'])
         cliente = requests.get(url).json()
 
@@ -130,11 +137,25 @@ def validar_transacoes():
         total_chances = sum(chances)
         normalized_chances = [c / total_chances for c in chances]
 
+        validadores_copy = validadores[:]
+        normalized_chances_copy = normalized_chances[:]
+
         # Selecionar aleatoriamente os 3 validadores
-        # TODO - Está selecionando o mesmo validador mais de uma vez
-        selected_validadores = random.choices(validadores, weights=normalized_chances, k=3)
+        for _ in range(3):
+            selected_validador = random.choices(validadores_copy, weights=normalized_chances_copy, k=1)[0]
+            selected_validadores.append(selected_validador)
+
+            i = validadores_copy.index(selected_validador)
+
+            del validadores_copy[i]
+            del normalized_chances_copy[i]
 
         if len(selected_validadores) < 3:
+            if sleep > 0:
+                url = banco_url + f'/transacoes/{id_transacao}/2'
+                requests.post(url)
+            
+            sleep += 1
             time.sleep(60)
 
     # Filtrar as transações pelo remetente
@@ -158,7 +179,7 @@ def validar_transacoes():
 
     # Exemplo de resposta (pode ser adaptado conforme necessário)
     conteudo_validacao = {
-        "id_transacao": data['id'],
+        "id_transacao": id_transacao,
         "saldo_cliente": cliente['qtdMoeda'],
         "valor_transacao": data['valor'],
         "horario": data['horario'],
@@ -167,13 +188,6 @@ def validar_transacoes():
         "horario_ultima_transacao": ultima_transacao['horario']
     }
 
-    validadores = []
-    for valid in selected_validadores:
-        # url = 'http://' + valid.ip + '/validar_transacao/'
-        validador = { 'id': valid.id, 'status': 0 }
-        validadores.append(validador)
-        # requests.post(url, conteudo_validacao)
-    
     validacoes_pendentes[data['id']] = { 
         'transacao': {
             'remetente': data['remetente'],
@@ -186,7 +200,12 @@ def validar_transacoes():
         'n_validadores': len(selected_validadores) 
     }
 
-    print(validacoes_pendentes)
+    validadores = []
+    for valid in selected_validadores:
+        url = 'http://' + valid.ip + '/validar_transacao/'
+        validador = { 'id': valid.id, 'status': 0 }
+        validadores.append(validador)
+        requests.post(url, json=conteudo_validacao)
 
     validadores_hold = Validador.query.filter(Validador.hold == False).all()
     for valid in validadores_hold:
@@ -200,6 +219,7 @@ def validar_transacoes():
 @app.route('/transacoes/resposta', methods=['POST'])
 def resposta_transacao():
     data = request.json
+
     id_transacao = data['id_transacao']
     id_validador = data['id_validador']
     status = data['status']
@@ -209,16 +229,16 @@ def resposta_transacao():
     validador = next((v for v in transacao['validadores'] if v['id'] == id_validador), None)
 
     if (not validador):
-        return jsonify(['Validador Inválido']), 400
+        return
     
     if (validador['status'] != 0):
-        return jsonify(['Validador já havia respondido!']), 400
+        return
 
     validador['status'] = status
     transacao['respostas'] += 1
 
     if (transacao['respostas'] != transacao['n_validadores']):
-        return jsonify(['Validação Concluída com Sucesso']), 200
+        return
     
     cont_status = Counter(validador['status'] for validador in transacao['validadores'])
     status_eleito, quant_status = cont_status.most_common(1)[0]
@@ -228,16 +248,63 @@ def resposta_transacao():
 
     dados_transacao = transacao['transacao']
 
-    moedas_remetente = dados_transacao['saldo_remetente'] - (dados_transacao['valor'] * 1.015)
+    if status_eleito == 1:
+        moedas_remetente = dados_transacao['saldo_remetente'] - (dados_transacao['valor'] * 1.015)
 
-    url = banco_url + f'/cliente/{str(dados_transacao['recebedor'])}'
-    moedas_recebedor = requests.get(url).json()['qtdMoeda'] + dados_transacao['valor']
+        url = banco_url + f'/cliente/{str(dados_transacao['recebedor'])}'
+        moedas_recebedor = requests.get(url).json()['qtdMoeda'] + dados_transacao['valor']
 
-    editar_cliente(dados_transacao['remetente'], moedas_remetente)
-    editar_cliente(dados_transacao['recebedor'], moedas_recebedor)
+        editar_cliente(dados_transacao['remetente'], moedas_remetente)
+        editar_cliente(dados_transacao['recebedor'], moedas_recebedor)
 
-    # TODO - Remover transação de transações pendentes
-    # TODO - Alterar validadores
+    transacao = validacoes_pendentes.pop(id_transacao)
+    validadores_corretos = [v for v in transacao['validadores'] if v['status'] == status_eleito]
+    validadores_incorretos = [v for v in transacao['validadores'] if v['status'] != status_eleito]
+
+    if status_eleito == 1:
+        taxa_validadores = 0.01 / len(validadores_corretos)
+        for valid in validadores_corretos:
+            validador = Validador.query.filter_by(id=valid['id']).first()
+            validador.id = id
+            validador.saldo = validador.saldo + (taxa_validadores * dados_transacao['valor'])
+            validador.transacoes_corretas = validador.transacoes_corretas + 1
+            if validador.transacoes_corretas >= 10000:
+                validador.flag = max(validador.flag - 1, 0)
+
+            db.session.commit()
+        
+        for valid in validadores_incorretos:
+            validador = Validador.query.filter_by(id=valid['id']).first()
+            validador.id = id
+            validador.flags = validador.flags + 1
+            validador.transacoes_corretas = 0
+            if validador.flags >= 2:
+                # TODO - Remover validador da rede, permitindo que ele retorne!!!
+                ...
+
+            db.session.commit()
+    else:
+        for valid in validadores_corretos:
+            validador = Validador.query.filter_by(id=valid['id']).first()
+            validador.id = id
+            validador.transacoes_corretas = validador.transacoes_corretas + 1
+            if validador.transacoes_corretas >= 10000:
+                validador.flag = max(validador.flag - 1, 0)
+            
+            db.session.commit()
+        
+        for valid in validadores_incorretos:
+            validador = Validador.query.filter_by(id=valid['id']).first()
+            validador.id = id
+            validador.flags = validador.flags + 1
+            validador.transacoes_corretas = 0
+            if validador.flags >= 2:
+                # TODO - Remover validador da rede, permitindo que ele retorne!!!
+                ...
+            
+            db.session.commit()
+
+    # TODO - Aplicar taxa para o seletor ????
 
     return 200
 
