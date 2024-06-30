@@ -12,12 +12,23 @@ app = Flask(__name__)
 app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///site.db'
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
-
+chave_unica_global = None
 @app.route("/cadastrar_validador/", methods=['POST'])
 def cadastro_validador():
     chave_unica = str(uuid.uuid4())
     return jsonify({"chave unica": chave_unica})
-
+@app.route("/remover_validador/", methods=['POST'])
+def remover_validador():
+    resposta = requests.delete(f'/remover_validador/{chave_unica_global}')
+    return resposta
+@app.route('/ransacoes/resposta', methods=['POST'])
+def handle_transacao_resposta():
+    global chave_unica_global
+    dados = request.json
+    chave_unica_global = dados.get('id', None)
+    resposta = requests.post('/seletor/validador',{'saldo': 51, 'ip': 'localhost:5002'})
+    chave_unica_global = resposta
+    return resposta.content
 
 @app.route("/validar_transacao/", methods=['POST'])
 def validar_transacao():
@@ -28,23 +39,22 @@ def validar_transacao():
     horario = data.get('horario')
     horario_atual = data.get("horario_atual")
     horario_ultima_transacao = data.get("horario_ultima_transacao")
-
     taxa_trancacao = valor_transacao * (0.015)
     if saldo_cliente < valor_transacao + taxa_trancacao:
-#falta metodo do seletor
-
+        dados = {'id_transacao': data.get('id'), 'id_validador': chave_unica_global, 'status': 2}
+        resposta = requests.post('/transacoes/resposta',  json=dados)
+        return resposta.content
     horario_transacao = datetime.fromisoformat(horario)
-
     if horario_transacao > horario_atual or horario_transacao <= horario_ultima_transacao:
-#falta metodo do seletor
-
+        dados = {'id_transacao': data.get('id'), 'id_validador':chave_unica_global, 'status': 2}
+        resposta = requests.post('/transacoes/resposta',  json=dados)
+        return resposta.content
     um_minuto_atras = horario_ultima_transacao - timedelta(minutes=-1)
-    transacoes_no_ultimo_minuto = [t for t in ultimas_transacoes if datetime.fromisoformat(t['horario_ultima_transacao']) > um_minuto_atras]
-
+    transacoes_no_ultimo_minuto = [t for t in ultimas_transacoes if datetime.fromisoformat(t['horario_ultima_transacao'])>um_minuto_atras]
     if len(transacoes_no_ultimo_minuto) > 100:
-# falta metodo do seletor
-###Na hora do cadastro o validador recebe uma chave única do seletor. Em toda transação, o
-###validador deve retornar a chave única que recebeu no cadastro. Caso as chaves sejam iguais, a
-###transação é concluída, caso contrário, a transação não é concluída
-
+        dados = {'id_transacao': data.get('id'), 'id_validador': chave_unica_global, 'status': 2}
+        resposta = requests.post('/transacoes/resposta',  json=dados)
+        return resposta.content
+    dados = {'id_transacao': data.get('id'), 'id_validador': chave_unica_global, 'status': 1}
+    requests.post('/transacoes/resposta', json=dados)
 app.run(host='0.0.0.0', port=5001, debug=True)
