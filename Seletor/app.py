@@ -154,6 +154,7 @@ def validar_transacoes():
             if sleep > 0:
                 url = banco_url + f'/transacoes/{id_transacao}/2'
                 requests.post(url)
+                return jsonify(['Não haviam validadores suficientes']), 500
             
             sleep += 1
             time.sleep(60)
@@ -188,6 +189,7 @@ def validar_transacoes():
         "horario_ultima_transacao": ultima_transacao['horario']
     }
 
+    validadores = []
     validacoes_pendentes[data['id']] = { 
         'transacao': {
             'remetente': data['remetente'],
@@ -200,7 +202,6 @@ def validar_transacoes():
         'n_validadores': len(selected_validadores) 
     }
 
-    validadores = []
     for valid in selected_validadores:
         url = 'http://' + valid.ip + '/validar_transacao/'
         validador = { 'id': valid.id, 'status': 0 }
@@ -209,12 +210,12 @@ def validar_transacoes():
 
     validadores_hold = Validador.query.filter(Validador.hold == False).all()
     for valid in validadores_hold:
-        valid.hold_expires -= 1
+        valid.hold_expires = min((valid.hold - 1), 0)
         if valid.hold_expires < 1:
             valid.hold = False
         db.session.commit()
 
-    return 200
+    return jsonify(['Transação em validação']), 200
 
 @app.route('/transacoes/resposta', methods=['POST'])
 def resposta_transacao():
@@ -229,22 +230,23 @@ def resposta_transacao():
     validador = next((v for v in transacao['validadores'] if v['id'] == id_validador), None)
 
     if (not validador):
-        return
+        return jsonify(['Validador não selecionado']), 400
     
     if (validador['status'] != 0):
-        return
+        return jsonify(['Validador já havia respondido']), 400
 
     validador['status'] = status
     transacao['respostas'] += 1
 
     if (transacao['respostas'] != transacao['n_validadores']):
-        return
+        return jsonify(['Validação Recebida']), 200
     
     cont_status = Counter(validador['status'] for validador in transacao['validadores'])
     status_eleito, quant_status = cont_status.most_common(1)[0]
 
     url = banco_url + f'/transacoes/{id_transacao}/{status_eleito}'
-    requests.post(url)
+    resposta = requests.post(url).json()
+    print(resposta)
 
     dados_transacao = transacao['transacao']
 
@@ -306,7 +308,7 @@ def resposta_transacao():
 
     # TODO - Aplicar taxa para o seletor ????
 
-    return 200
+    return jsonify(['Validação concluída com sucesso!']), 200
 
 
 def editar_cliente(id: int, moedas: int):
