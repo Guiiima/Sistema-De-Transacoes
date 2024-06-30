@@ -291,7 +291,7 @@ def resposta_transacao():
         editar_cliente(dados_transacao['remetente'], moedas_remetente)
         editar_cliente(dados_transacao['recebedor'], moedas_recebedor)
 
-    transacao = validacoes_pendentes.pop(id_transacao)
+    validacoes_pendentes.pop(id_transacao)
     validadores_corretos = [v for v in transacao['validadores'] if v['status'] == status_eleito]
     validadores_incorretos = [v for v in transacao['validadores'] if v['status'] != status_eleito]
 
