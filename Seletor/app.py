@@ -270,75 +270,73 @@ def resposta_transacao():
     validador['status'] = status
     transacao['respostas'] += 1
 
-    if transacao['respostas'] != transacao['n_validadores']:
+    if transacao['respostas'] < transacao['n_validadores']:
         return jsonify(['Validação Recebida']), 200
 
-    cont_status = Counter(validador['status'] for validador in transacao['validadores'])
-    status_eleito, quant_status = cont_status.most_common(1)[0]
+    if transacao['respostas'] == transacao['n_validadores']:
+        cont_status = Counter(validador['status'] for validador in transacao['validadores'])
+        status_eleito, quant_status = cont_status.most_common(1)[0]
 
-    url = banco_url + f'/transacoes/{id_transacao}/{status_eleito}'
-    resposta = requests.post(url).json()
-    print(resposta)
+        url = banco_url + f'/transacoes/{id_transacao}/{status_eleito}'
+        requests.post(url).json()
 
-    dados_transacao = transacao['transacao']
+        dados_transacao = transacao['transacao']
 
-    if status_eleito == 1:
-        moedas_remetente = dados_transacao['saldo_remetente'] - (dados_transacao['valor'] * 1.015)
+        if status_eleito == 1:
+            moedas_remetente = dados_transacao['saldo_remetente'] - (dados_transacao['valor'] * 1.015)
 
-        url = banco_url + f'/cliente/{str(dados_transacao['recebedor'])}'
-        moedas_recebedor = requests.get(url).json()['qtdMoeda'] + dados_transacao['valor']
+            url = banco_url + f'/cliente/{str(dados_transacao['recebedor'])}'
+            moedas_recebedor = requests.get(url).json()['qtdMoeda'] + dados_transacao['valor']
 
-        editar_cliente(dados_transacao['remetente'], moedas_remetente)
-        editar_cliente(dados_transacao['recebedor'], moedas_recebedor)
+            editar_cliente(dados_transacao['remetente'], moedas_remetente)
+            editar_cliente(dados_transacao['recebedor'], moedas_recebedor)
 
-    validacoes_pendentes.pop(id_transacao)
-    validadores_corretos = [v for v in transacao['validadores'] if v['status'] == status_eleito]
-    validadores_incorretos = [v for v in transacao['validadores'] if v['status'] != status_eleito]
+        validacoes_pendentes.pop(id_transacao)
+        validadores_corretos = [v for v in transacao['validadores'] if v['status'] == status_eleito]
+        validadores_incorretos = [v for v in transacao['validadores'] if v['status'] != status_eleito]
 
-    if status_eleito == 1:
-        taxa_validadores = 0.01 / len(validadores_corretos)
-        for valid in validadores_corretos:
-            validador = Validador.query.filter_by(id=valid['id']).first()
-            validador.id = id
-            validador.saldo = validador.saldo + (taxa_validadores * dados_transacao['valor'])
-            validador.transacoes_corretas = validador.transacoes_corretas + 1
-            if validador.transacoes_corretas >= 10000:
-                validador.flag = max(validador.flag - 1, 0)
+        if status_eleito == 1:
+            taxa_validadores = 0.01 / (len(validadores_corretos) if len(validadores_corretos) > 0 else 1)
+            for valid in validadores_corretos:
+                validador = Validador.query.filter_by(id=valid['id']).first()
+                validador.saldo = validador.saldo + (taxa_validadores * dados_transacao['valor'])
+                validador.transacoes_corretas = validador.transacoes_corretas + 1
+                if validador.transacoes_corretas >= 10000:
+                    validador.flag = max(validador.flag - 1, 0)
 
-            db.session.commit()
+                db.session.commit()
 
-        for valid in validadores_incorretos:
-            validador = Validador.query.filter_by(id=valid['id']).first()
-            validador.id = id
-            validador.flags = validador.flags + 1
-            validador.transacoes_corretas = 0
-            if validador.flags > 2:
-                validador.active = False
-                validador.expelled += 1
+            for valid in validadores_incorretos:
+                validador = Validador.query.filter_by(id=valid['id']).first()
+                validador.flags = validador.flags + 1
+                validador.transacoes_corretas = 0
+                if validador.flags > 2:
+                    validador.active = False
+                    validador.expelled += 1
 
-            db.session.commit()
+                db.session.commit()
+        else:
+            for valid in validadores_corretos:
+                validador = Validador.query.filter_by(id=valid['id']).first()
+                validador.transacoes_corretas = validador.transacoes_corretas + 1
+                if validador.transacoes_corretas >= 10000:
+                    validador.flag = max(validador.flag - 1, 0)
+
+                db.session.commit()
+
+            for valid in validadores_incorretos:
+                validador = Validador.query.filter_by(id=valid['id']).first()
+                validador.flags = validador.flags + 1
+                validador.transacoes_corretas = 0
+                if validador.flags > 2:
+                    validador.active = False
+                    validador.expelled += 1
+
+                db.session.commit()
+
+        # Aplicar taxa para o seletor ????
     else:
-        for valid in validadores_corretos:
-            validador = Validador.query.filter_by(id=valid['id']).first()
-            validador.id = id
-            validador.transacoes_corretas = validador.transacoes_corretas + 1
-            if validador.transacoes_corretas >= 10000:
-                validador.flag = max(validador.flag - 1, 0)
-
-            db.session.commit()
-
-        for valid in validadores_incorretos:
-            validador = Validador.query.filter_by(id=valid['id']).first()
-            validador.id = id
-            validador.flags = validador.flags + 1
-            validador.transacoes_corretas = 0
-            if validador.flags > 2:
-                validador.active = False
-                validador.expelled += 1
-
-            db.session.commit()
-
-    # TODO - Aplicar taxa para o seletor ????
+        return jsonify(['Validação recebida!']), 200
 
     return jsonify(['Validação concluída com sucesso!']), 200
 
