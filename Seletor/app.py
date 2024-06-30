@@ -25,6 +25,18 @@ seletor_url = ip + ':5001'
 
 validacoes_pendentes = {}
 
+@dataclass
+class Seletor(db.Model):
+    id: int
+    nome: str
+    ip: str
+    moedas: int
+
+    id = db.Column(db.Integer, primary_key=True)
+    nome = db.Column(db.String(20), unique=False, nullable=False)
+    ip = db.Column(db.String(15), unique=False, nullable=False)
+    moedas = db.Column(db.Integer, primary_key=False)
+
 
 @dataclass
 class Validador(db.Model):
@@ -57,10 +69,17 @@ with app.app_context():
 
 @app.route('/cadastrar_seletor', methods=['POST'])
 def cadastrar_seletor():
-    url = banco_url + '/seletor/Seletor/' + seletor_url
-    requests.post(url)
+    try:
+        url = banco_url + '/seletor/Seletor/' + seletor_url
+        retorno = requests.post(url).json()
 
-    return 200
+        seletor = Seletor(retorno['id'], retorno['nome'], retorno['ip'], retorno['moedas'])
+        db.session.add(seletor)
+        db.session.commit()
+        return jsonify({"status": "success", "message": "Sucesso ao cadastrar seletor."}), 200
+    except Exception as e:
+        db.session.rollback()
+        return jsonify({"status": "error", "message": "Erro ao cadastrar seletor."}), 500
 
 
 @app.route('/seletor/validador', methods=['POST'])
@@ -283,7 +302,7 @@ def resposta_transacao():
         dados_transacao = transacao['transacao']
 
         if status_eleito == 1:
-            moedas_remetente = dados_transacao['saldo_remetente'] - (dados_transacao['valor'] * 1.015)
+            moedas_remetente = dados_transacao['saldo_remetente'] - round((dados_transacao['valor'] * 1.015))
 
             url = banco_url + f'/cliente/{str(dados_transacao['recebedor'])}'
             moedas_recebedor = requests.get(url).json()['qtdMoeda'] + dados_transacao['valor']
@@ -296,7 +315,16 @@ def resposta_transacao():
         validadores_incorretos = [v for v in transacao['validadores'] if v['status'] != status_eleito]
 
         if status_eleito == 1:
-            taxa_validadores = 0.01 / (len(validadores_corretos) if len(validadores_corretos) > 0 else 1)
+            taxa_validadores = round(0.01 / (len(validadores_corretos) if len(validadores_corretos) > 0 else 1))
+            taxa_seletor = 0.005
+
+            seletor = Seletor.query.first()
+            seletor.moedas += round(taxa_seletor * dados_transacao['valor'])
+            db.session.commit()
+
+            url = banco_url + f'/seletor/{seletor.id}/{seletor.nome}/{seletor.ip}/{seletor.moedas}'
+            requests.post(url).json()
+
             for valid in validadores_corretos:
                 validador = Validador.query.filter_by(id=valid['id']).first()
                 validador.saldo = validador.saldo + (taxa_validadores * dados_transacao['valor'])
@@ -333,8 +361,6 @@ def resposta_transacao():
                     validador.expelled += 1
 
                 db.session.commit()
-
-        # Aplicar taxa para o seletor ????
     else:
         return jsonify(['Validação recebida!']), 200
 
