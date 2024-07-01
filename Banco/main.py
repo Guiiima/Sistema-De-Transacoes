@@ -96,18 +96,22 @@ def UmCliente(id):
 def EditarCliente(id, qtdMoedas):
     if request.method == 'POST':
         try:
-            cliente = Cliente.query.filter_by(id=id).first()
-            cliente.qtdMoedas = qtdMoedas
+            cliente = Cliente.query.get(id)
+            db.session.commit()
+            cliente.qtdMoeda = qtdMoedas
+            print(cliente.qtdMoeda)
+            print(qtdMoedas)
+            print(cliente)
             db.session.commit()
             return jsonify(['Alteração feita com sucesso'])
         except Exception as e:
             data = {
                 "message": "Atualização não realizada"
             }
-            return jsonify(data)
+            return jsonify(data), 500
 
     else:
-        return jsonify(['Method Not Allowed'])
+        return jsonify(['Method Not Allowed']), 400
 
 
 @app.route('/cliente/<int:id>', methods=['DELETE'])
@@ -153,7 +157,7 @@ def UmSeletor(id):
         return jsonify(['Method Not Allowed'])
 
 
-@app.route('/seletor/<int:id>/<string:nome>/<string:ip><int:moedas>', methods=["POST"])
+@app.route('/seletor/<int:id>/<string:nome>/<string:ip>/<int:moedas>', methods=["POST"])
 def EditarSeletor(id, nome, ip, moedas):
     if request.method == 'POST':
         try:
@@ -165,6 +169,7 @@ def EditarSeletor(id, nome, ip, moedas):
             seletor.nome = varNome
             seletor.ip = varIp
             seletor.moedas = varMoeda
+            print(seletor)
             db.session.commit()
             return jsonify(seletor)
         except Exception as e:

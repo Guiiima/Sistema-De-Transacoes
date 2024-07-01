@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta
 import time
+import math
 
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
@@ -22,9 +23,9 @@ banco_url = 'http://banco:5000'
 seletor_url = 'seletor:5000'
 porta = 5000
 
-banco_url = 'http://localhost:5000'
-seletor_url = 'localhost:5001'
-porta = 5001
+# banco_url = 'http://localhost:5000'
+# seletor_url = 'localhost:5001'
+# porta = 5001
 
 validacoes_pendentes = {}
 
@@ -306,7 +307,7 @@ def resposta_transacao():
         dados_transacao = transacao['transacao']
 
         if status_eleito == 1:
-            moedas_remetente = dados_transacao['saldo_remetente'] - round((dados_transacao['valor'] * 1.015))
+            moedas_remetente = dados_transacao['saldo_remetente'] - math.ceil((dados_transacao['valor'] * 1.015))
 
             url = banco_url + f'/cliente/{str(dados_transacao['recebedor'])}'
             moedas_recebedor = requests.get(url).json()['qtdMoeda'] + dados_transacao['valor']
@@ -319,13 +320,14 @@ def resposta_transacao():
         validadores_incorretos = [v for v in transacao['validadores'] if v['status'] != status_eleito]
 
         if status_eleito == 1:
-            taxa_validadores = round(0.01 / (len(validadores_corretos) if len(validadores_corretos) > 0 else 1))
+            taxa_validadores = math.ceil(0.01 / (len(validadores_corretos) if len(validadores_corretos) > 0 else 1))
             taxa_seletor = 0.005
 
             seletor = Seletor.query.first()
-            seletor.moedas += round(taxa_seletor * dados_transacao['valor'])
+            seletor.moedas += math.ceil(taxa_seletor * dados_transacao['valor'])
             db.session.commit()
 
+            seletor = Seletor.query.first()
             url = banco_url + f'/seletor/{seletor.id}/{seletor.nome}/{seletor.ip}/{seletor.moedas}'
             requests.post(url).json()
 
@@ -372,7 +374,7 @@ def resposta_transacao():
 
 
 def editar_cliente(id: int, moedas: int):
-    url = banco_url + f'/cliente/{str(id)}/{str(moedas)}'
+    url = banco_url + f'/cliente/{id}/{moedas}'
     requests.post(url)
 
 

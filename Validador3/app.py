@@ -4,6 +4,7 @@ from flask import Flask, request, jsonify
 from datetime import datetime
 import requests
 from concurrent.futures import ThreadPoolExecutor
+import math
 
 app = Flask(__name__)
 executor = ThreadPoolExecutor(max_workers=2)
@@ -17,9 +18,9 @@ seletor_url = 'http://seletor:5000'
 validador_url = 'validador3:5000'
 porta = 5000
 
-seletor_url = 'http://localhost:5001'
-validador_url = 'localhost:5004'
-porta = 5004
+# seletor_url = 'http://localhost:5001'
+# validador_url = 'localhost:5004'
+# porta = 5004
 
 
 class Id(db.Model):
@@ -69,10 +70,9 @@ def processar_transacao(data, id):
     horario = data.get('horario')
     horario_atual = data.get("horario_atual")
     horario_ultima_transacao = data.get("horario_ultima_transacao")
-    taxa_trancacao = round(valor_transacao * 0.015)
+    taxa_trancacao = math.ceil(valor_transacao * 0.015)
 
     if saldo_cliente < valor_transacao + taxa_trancacao:
-        print("Saldo")
         dados = {'id_transacao': id_transacao, 'id_validador': id, 'status': 2}
         requests.post(f'{seletor_url}/transacoes/resposta', json=dados)
         return
@@ -81,13 +81,11 @@ def processar_transacao(data, id):
     horario_atual = datetime.fromisoformat(horario_atual)
     horario_ultima_transacao = datetime.fromisoformat(horario_ultima_transacao)
     if horario_transacao > horario_atual or horario_transacao <= horario_ultima_transacao:
-        print("Horário")
         dados = {'id_transacao': id_transacao, 'id_validador': id, 'status': 2}
         requests.post(f'{seletor_url}/transacoes/resposta', json=dados)
         return
 
     if len(ultimas_transacoes) > 100:
-        print("Muitas transacoes")
         dados = {'id_transacao': id_transacao, 'id_validador': id, 'status': 2}
         requests.post(f'{seletor_url}/transacoes/resposta', json=dados)
         return
