@@ -14,12 +14,12 @@ migrate = Migrate(app, db)
 
 # Docker
 seletor_url = 'http://seletor:5000'
-validador_url = 'validador1:5000'
+validador_url = 'validador3:5000'
 porta = 5000
 
 seletor_url = 'http://localhost:5001'
-validador_url = 'localhost:5002'
-porta = 5002
+validador_url = 'localhost:5004'
+porta = 5004
 
 
 class Id(db.Model):

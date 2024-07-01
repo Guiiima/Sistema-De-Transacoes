@@ -17,11 +17,14 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'sqlite:///validadores.db'
 db = SQLAlchemy(app)
 migrate = Migrate(app, db)
 
-# Para usar sem o docker mudar para 'localhost'
-ip = 'localhost'
-banco_url = 'http://' + ip + ':5000'
+# Docker
+banco_url = 'http://banco:5000'
+seletor_url = 'seletor:5000'
+porta = 5000
 
-seletor_url = ip + ':5001'
+banco_url = 'http://localhost:5000'
+seletor_url = 'localhost:5001'
+porta = 5001
 
 validacoes_pendentes = {}
 
@@ -70,10 +73,10 @@ with app.app_context():
 @app.route('/cadastrar_seletor', methods=['POST'])
 def cadastrar_seletor():
     try:
-        url = banco_url + '/seletor/Seletor/' + seletor_url
+        url = banco_url + f'/seletor/Seletor/{seletor_url}/{100}' 
         retorno = requests.post(url).json()
-
-        seletor = Seletor(retorno['id'], retorno['nome'], retorno['ip'], retorno['moedas'])
+        print(retorno)
+        seletor = Seletor(id=retorno['id'], nome=retorno['nome'], ip=retorno['ip'], moedas=retorno['moedas'])
         db.session.add(seletor)
         db.session.commit()
         return jsonify({"status": "success", "message": "Sucesso ao cadastrar seletor."}), 200
@@ -270,6 +273,7 @@ def validar_transacoes():
 
 @app.route('/transacoes/resposta', methods=['POST'])
 def resposta_transacao():
+    time.sleep(0.5)
     data = request.json
 
     id_transacao = data['id_transacao']
@@ -392,4 +396,4 @@ def atualizar_validador(ip, saldo):
         return jsonify(['Method Not Allowed'])
 
 
-app.run(host='0.0.0.0', port=5001, debug=True)
+app.run(host='0.0.0.0', port=porta, debug=True)

@@ -135,7 +135,7 @@ def ListarSeletor():
 
 @app.route('/seletor/<string:nome>/<string:ip>/<int:moedas>', methods=['POST'])
 def InserirSeletor(nome, ip, moedas):
-    if request.method == 'POST' and nome != '' and ip != '' and moedas < 0:
+    if request.method == 'POST' and nome != '' and ip != '':
         objeto = Seletor(nome=nome, ip=ip, moedas=moedas)
         db.session.add(objeto)
         db.session.commit()
