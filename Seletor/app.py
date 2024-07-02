@@ -192,17 +192,7 @@ def validar_transacoes():
         validadores_copy = validadores[:]
         normalized_chances_copy = normalized_chances[:]
 
-        # Selecionar aleatoriamente os 3 validadores
-        for _ in range(3):
-            selected_validador = random.choices(validadores_copy, weights=normalized_chances_copy, k=1)[0]
-            selected_validadores.append(selected_validador)
-
-            i = validadores_copy.index(selected_validador)
-
-            del validadores_copy[i]
-            del normalized_chances_copy[i]
-
-        if len(selected_validadores) < 3:
+        if len(validadores_copy) < 3:
             if sleep > 0:
                 url = banco_url + f'/transacoes/{id_transacao}/2'
                 requests.post(url)
@@ -210,6 +200,17 @@ def validar_transacoes():
 
             sleep += 1
             time.sleep(60)
+        else:
+            # Selecionar aleatoriamente os 3 validadores
+            for _ in range(3):
+                selected_validador = random.choices(validadores_copy, weights=normalized_chances_copy, k=1)[0]
+                selected_validadores.append(selected_validador)
+
+                i = validadores_copy.index(selected_validador)
+
+                del validadores_copy[i]
+                del normalized_chances_copy[i]
+
 
     # Filtrar as transações pelo remetente
     url_transacoes = banco_url + '/transacoes'
