@@ -23,9 +23,9 @@ banco_url = 'http://banco:5000'
 seletor_url = 'seletor:5000'
 porta = 5000
 
-# banco_url = 'http://localhost:5000'
-# seletor_url = 'localhost:5001'
-# porta = 5001
+banco_url = 'http://localhost:5000'
+seletor_url = 'localhost:5001'
+porta = 5001
 
 validacoes_pendentes = {}
 
@@ -54,6 +54,10 @@ class Validacao(db.Model):
     status = db.Column(db.Integer, unique=False, nullable=False)
     validacao = db.Column(db.String(40), unique=False, nullable=False)
     pendente = db.Column(db.Boolean, primary_key=False)
+
+    __table_args__ = (
+        db.PrimaryKeyConstraint('id', 'id_validador'),
+    )
 
 @dataclass
 class Validador(db.Model):
@@ -89,7 +93,6 @@ def cadastrar_seletor():
     try:
         url = banco_url + f'/seletor/Seletor/{seletor_url}/{100}' 
         retorno = requests.post(url).json()
-        print(retorno)
         seletor = Seletor(id=retorno['id'], nome=retorno['nome'], ip=retorno['ip'], moedas=retorno['moedas'])
         db.session.add(seletor)
         db.session.commit()
@@ -270,7 +273,7 @@ def validar_transacoes():
     }
 
     for valid in selected_validadores:
-        validacao = Validacao(data['id'], valid.id, 0, '', True)
+        validacao = Validacao(id=data['id'], id_validador=valid.id, status=0, validacao='', pendente=True)
         db.session.add(validacao)
         db.session.commit()
         url = 'http://' + valid.ip + '/validar_transacao/'

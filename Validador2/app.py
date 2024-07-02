@@ -18,9 +18,9 @@ seletor_url = 'http://seletor:5000'
 validador_url = 'validador2:5000'
 porta = 5000
 
-# seletor_url = 'http://localhost:5001'
-# validador_url = 'localhost:5003'
-# porta = 5003
+seletor_url = 'http://localhost:5001'
+validador_url = 'localhost:5003'
+porta = 5003
 
 
 class Id(db.Model):
@@ -72,7 +72,7 @@ def processar_transacao(data, id):
     horario_ultima_transacao = data.get("horario_ultima_transacao")
     taxa_trancacao = math.ceil(valor_transacao * 0.015)
 
-        if saldo_cliente < valor_transacao + taxa_trancacao:
+    if saldo_cliente < valor_transacao + taxa_trancacao:
         dados = {'id_transacao': id_transacao, 'id_validador': id, 'status': 2, 'motivo' : 'Saldo insuficiente.'}
         requests.post(f'{seletor_url}/transacoes/resposta', json=dados)
         return

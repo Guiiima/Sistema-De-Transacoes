@@ -99,9 +99,6 @@ def EditarCliente(id, qtdMoedas):
             cliente = Cliente.query.get(id)
             db.session.commit()
             cliente.qtdMoeda = qtdMoedas
-            print(cliente.qtdMoeda)
-            print(qtdMoedas)
-            print(cliente)
             db.session.commit()
             return jsonify(['Alteração feita com sucesso'])
         except Exception as e:
@@ -169,7 +166,6 @@ def EditarSeletor(id, nome, ip, moedas):
             seletor.nome = varNome
             seletor.ip = varIp
             seletor.moedas = varMoeda
-            print(seletor)
             db.session.commit()
             return jsonify(seletor)
         except Exception as e:

@@ -18,9 +18,9 @@ seletor_url = 'http://seletor:5000'
 validador_url = 'validador1:5000'
 porta = 5000
 
-# seletor_url = 'http://localhost:5001'
-# validador_url = 'localhost:5002'
-# porta = 5002
+seletor_url = 'http://localhost:5001'
+validador_url = 'localhost:5002'
+porta = 5002
 
 
 class Id(db.Model):
