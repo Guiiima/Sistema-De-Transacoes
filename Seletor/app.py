@@ -229,8 +229,7 @@ def validar_transacoes():
     transacoes_recentes = [transacao for transacao in transacoes_filtradas if
                            datetime.fromisoformat(transacao['horario']) >= horario_limite]
 
-    hora_atual = datetime.strptime(requests.get(banco_url + '/hora').json(), '%a, %d %b %Y %H:%M:%S %Z').strftime(
-        '%Y-%m-%dT%H:%M:%S.%f')
+    hora_atual = requests.get(banco_url + '/hora').json()
 
     # Exemplo de resposta (pode ser adaptado conforme necessário)
     conteudo_validacao = {
