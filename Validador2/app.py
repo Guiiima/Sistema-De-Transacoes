@@ -72,8 +72,8 @@ def processar_transacao(data, id):
     horario_ultima_transacao = data.get("horario_ultima_transacao")
     taxa_trancacao = math.ceil(valor_transacao * 0.015)
 
-    if saldo_cliente < valor_transacao + taxa_trancacao:
-        dados = {'id_transacao': id_transacao, 'id_validador': id, 'status': 2}
+        if saldo_cliente < valor_transacao + taxa_trancacao:
+        dados = {'id_transacao': id_transacao, 'id_validador': id, 'status': 2, 'motivo' : 'Saldo insuficiente.'}
         requests.post(f'{seletor_url}/transacoes/resposta', json=dados)
         return
 
@@ -81,17 +81,18 @@ def processar_transacao(data, id):
     horario_atual = datetime.fromisoformat(horario_atual)
     horario_ultima_transacao = datetime.fromisoformat(horario_ultima_transacao)
     if horario_transacao > horario_atual or horario_transacao <= horario_ultima_transacao:
-        dados = {'id_transacao': id_transacao, 'id_validador': id, 'status': 2}
+        dados = {'id_transacao': id_transacao, 'id_validador': id, 'status': 2, 'motivo' : 'Horario da transacao invalida.'}
         requests.post(f'{seletor_url}/transacoes/resposta', json=dados)
         return
 
     if len(ultimas_transacoes) > 100:
-        dados = {'id_transacao': id_transacao, 'id_validador': id, 'status': 2}
+        dados = {'id_transacao': id_transacao, 'id_validador': id, 'status': 2, 'motivo' : 'Muitas transações feitas no ultimo minuto.'}
         requests.post(f'{seletor_url}/transacoes/resposta', json=dados)
         return
 
-    dados = {'id_transacao': id_transacao, 'id_validador': id, 'status': 1}
+    dados = {'id_transacao': id_transacao, 'id_validador': id, 'status': 1, 'motivo' : 'Transação aprovada.'}
     requests.post(f'{seletor_url}/transacoes/resposta', json=dados)
+
 
 
 app.run(host='0.0.0.0', port=porta, debug=True)

@@ -41,6 +41,19 @@ class Seletor(db.Model):
     ip = db.Column(db.String(15), unique=False, nullable=False)
     moedas = db.Column(db.Integer, primary_key=False)
 
+@dataclass
+class Validacao(db.Model):
+    id: int
+    id_validador: int
+    status: int
+    validacao: str
+    pendente: bool
+
+    id = db.Column(db.Integer, nullable=False)
+    id_validador = db.Column(db.Integer, unique=False, nullable=False)
+    status = db.Column(db.Integer, unique=False, nullable=False)
+    validacao = db.Column(db.String(40), unique=False, nullable=False)
+    pendente = db.Column(db.Boolean, primary_key=False)
 
 @dataclass
 class Validador(db.Model):
@@ -257,6 +270,9 @@ def validar_transacoes():
     }
 
     for valid in selected_validadores:
+        validacao = Validacao(data['id'], valid.id, 0, '', True)
+        db.session.add(validacao)
+        db.session.commit()
         url = 'http://' + valid.ip + '/validar_transacao/'
         validador = {'id': valid.id, 'status': 0}
         validadores.append(validador)
@@ -280,6 +296,11 @@ def resposta_transacao():
     id_transacao = data['id_transacao']
     id_validador = data['id_validador']
     status = data['status']
+    motivo = data['motivo']
+    validacao = Validacao.query.filter_by(id = id_transacao, id_validador = id_validador).first()
+    validacao.status = status
+    validacao.validacao = motivo 
+    db.session.commit()
 
     transacao = validacoes_pendentes[id_transacao]
 
@@ -298,6 +319,10 @@ def resposta_transacao():
         return jsonify(['Validação Recebida']), 200
 
     if transacao['respostas'] == transacao['n_validadores']:
+        validacaoMotivo = Validacao.query.filter_by(id = id_transacao).all()
+        for validar in validacaoMotivo:
+            validar.pendente = False
+        db.session.commit()
         cont_status = Counter(validador['status'] for validador in transacao['validadores'])
         status_eleito, quant_status = cont_status.most_common(1)[0]
 
