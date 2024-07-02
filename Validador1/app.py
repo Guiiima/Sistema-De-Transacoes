@@ -33,10 +33,16 @@ with app.app_context():
     db.create_all()
 
 
-@app.route("/cadastrar_validador/", methods=['POST'])
+@app.route("/cadastrar_validador", methods=['POST'])
 def cadastrar_validador():
-    dados = {'saldo': 51, 'ip': validador_url}
-    resposta = requests.post(f'{seletor_url}/seletor/validador', json=dados).json()
+    data = request.json
+    data['ip'] = validador_url
+    required_fields = ['saldo']
+    for field in required_fields:
+        if field not in data:
+            return jsonify({"status": "error", "message": f"Campo {field} é obrigatório"}), 400
+
+    resposta = requests.post(f'{seletor_url}/seletor/validador', json=data).json()
 
     id = Id(id=resposta['id'])
     db.session.add(id)

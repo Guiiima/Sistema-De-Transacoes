@@ -281,7 +281,7 @@ def validar_transacoes():
         validadores.append(validador)
         requests.post(url, json=conteudo_validacao)
 
-    validadores_hold = Validador.query.filter(Validador.hold == False).all()
+    validadores_hold = Validador.query.filter(Validador.hold == True).all()
     for valid in validadores_hold:
         valid.hold_expires = min((valid.hold - 1), 0)
         if valid.hold_expires < 1:
